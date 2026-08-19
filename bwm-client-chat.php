@@ -3,7 +3,7 @@
  * Plugin Name: BWM Client Chat
  * Plugin URI: https://www.betterwebmanagement.com
  * Description: Client-facing website assistant powered by Better Web Management Command Center.
- * Version: 2.1.0
+ * Version: 2.1.1
  * Author: Better Web Management
  * Author URI: https://www.betterwebmanagement.com
  * License: GPL v2 or later
@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) exit;
 final class BWM_Client_Chat {
     private static $instance = null;
     private $option_name = 'bwm_client_chat_settings';
-    private $version = '2.1.0';
+    private $version = '2.1.1';
 
     public static function get_instance() {
         if (self::$instance === null) self::$instance = new self();
@@ -318,7 +318,7 @@ final class BWM_Client_Chat {
         <div id="bwm-chat-widget" class="bwm-position-<?php echo esc_attr($position); ?>" style="<?php echo esc_attr($position_style); ?>" data-color="<?php echo esc_attr($settings['primary_color']); ?>">
             <button id="bwm-chat-toggle" class="bwm-chat-btn" type="button" aria-label="Open BWM Chat"><span class="bwm-chat-icon" style="display:<?php echo $open ? 'none' : 'flex'; ?>;">💬</span><span class="bwm-chat-close" style="display:<?php echo $open ? 'flex' : 'none'; ?>;">×</span></button>
             <div id="bwm-chat-panel" style="display:<?php echo $open ? 'flex' : 'none'; ?>;<?php echo esc_attr($panel_style); ?>">
-                <div class="bwm-chat-header"><div class="bwm-chat-title"><strong>BWM Assistant</strong><small>Powered by Command Center</small></div><div class="bwm-chat-header-actions"><button id="bwm-chat-select-element" type="button" class="bwm-select-btn" title="Select an element on this page">Select</button><div class="bwm-chat-usage"><span id="bwm-usage-count"><?php echo esc_html($this->get_usage()['count']); ?></span>/<?php echo esc_html($settings['daily_limit']); ?></div></div></div>
+                <div class="bwm-chat-header"><div class="bwm-chat-title"><strong>BWM Assistant</strong><small>Powered by Command Center</small></div><div class="bwm-chat-header-actions"><button id="bwm-chat-select-element" type="button" class="bwm-select-btn" title="Select an element on this page">Select</button></div></div>
                 <div id="bwm-chat-selection" class="bwm-selection-chip" hidden><span id="bwm-chat-selection-label"></span><button id="bwm-chat-clear-selection" type="button" aria-label="Clear selected element" title="Clear selected element (Esc)">× Deselect</button></div>
                 <div id="bwm-chat-messages" aria-live="polite"><div class="bwm-chat-message bwm-bot"><div class="bwm-message-content"><?php echo esc_html($settings['welcome_message']); ?></div></div></div>
                 <div class="bwm-chat-input-area"><textarea id="bwm-chat-input" placeholder="Ask about this page or describe a change..." rows="2"></textarea><button id="bwm-chat-send" class="bwm-send-btn" type="button" aria-label="Send message">➤</button></div>

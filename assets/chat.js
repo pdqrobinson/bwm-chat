@@ -128,7 +128,9 @@
         selectedElement = selectionFromElement(target);
         stopSelecting();
         showSelection();
-        addMessage('bot', 'Selected ' + (selectedElement.selector || selectedElement.tag) + '. Tell me what you want changed.');
+        // No transcript message: selecting again used to append another "Selected ..." line, which
+        // read as several live selections when only the newest is ever sent. The chip is the single
+        // source of truth for what is selected.
         if (!isOpen) setOpen(true);
         input.focus();
     }, true);
@@ -275,8 +277,9 @@
                     return;
                 }
                 addMessage('bot', data.data.response || 'Request processed.');
+                // Still tracked for the client-side daily guard, just not displayed.
                 config.usageCount = Number(data.data.usage_count || config.usageCount || 0);
-                usageCount.textContent = String(config.usageCount);
+                if (usageCount) usageCount.textContent = String(config.usageCount);
                 (Array.isArray(data.data.artifacts) ? data.data.artifacts : []).forEach(addArtifact);
             })
             .catch(() => {

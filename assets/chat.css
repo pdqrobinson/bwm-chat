@@ -45,13 +45,6 @@
 .bwm-chat-title strong { display: block; font-size: 16px; }
 .bwm-chat-title small { opacity: .82; font-size: 11px; }
 .bwm-chat-header-actions { display: flex; gap: 8px; align-items: center; }
-.bwm-chat-usage {
-    background: rgba(255,255,255,.2);
-    padding: 4px 9px;
-    border-radius: 12px;
-    font-size: 11px;
-    white-space: nowrap;
-}
 .bwm-select-btn {
     border: 1px solid rgba(255,255,255,.45);
     background: rgba(255,255,255,.14);
@@ -150,5 +143,5 @@ body.bwm-chat-selecting #bwm-chat-widget, body.bwm-chat-selecting #bwm-chat-widg
     #bwm-chat-panel { width: calc(100vw - 32px); max-width: 390px; bottom: 70px; max-height: 70vh; }
     #bwm-chat-messages { max-height: 42vh; }
     .bwm-chat-header { padding: 12px; }
-    .bwm-chat-usage { display: none; }
+
 }
