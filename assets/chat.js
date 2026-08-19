@@ -172,6 +172,20 @@
             detail.textContent = artifact.status === 'pass'
                 ? 'Command Center inspected the rendered page after the change.'
                 : 'The change was not visually verified yet.';
+        } else if (artifact.type === 'activity_log') {
+            const steps = Array.isArray(artifact.steps) ? artifact.steps.slice(0, 20) : [];
+            if (!steps.length) {
+                title.textContent = 'No site actions';
+                detail.textContent = 'The assistant did not read or change anything on this site.';
+            } else {
+                title.textContent = 'Site actions (' + steps.length + ')';
+                detail.textContent = steps
+                    .map(function (step) {
+                        const name = String((step && step.name) || 'step').slice(0, 60);
+                        return (step && step.success ? '✓ ' : '✗ ') + name;
+                    })
+                    .join('  ');
+            }
         } else if (artifact.type === 'warning') {
             title.textContent = 'Needs attention';
             detail.textContent = String(artifact.message || 'Command Center returned a warning.').slice(0, 300);

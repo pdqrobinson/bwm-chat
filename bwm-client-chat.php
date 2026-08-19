@@ -3,7 +3,7 @@
  * Plugin Name: BWM Client Chat
  * Plugin URI: https://www.betterwebmanagement.com
  * Description: Client-facing website assistant powered by Better Web Management Command Center.
- * Version: 2.0.0
+ * Version: 2.0.1
  * Author: Better Web Management
  * Author URI: https://www.betterwebmanagement.com
  * License: GPL v2 or later
@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) exit;
 final class BWM_Client_Chat {
     private static $instance = null;
     private $option_name = 'bwm_client_chat_settings';
-    private $version = '2.0.0';
+    private $version = '2.0.1';
 
     public static function get_instance() {
         if (self::$instance === null) self::$instance = new self();
