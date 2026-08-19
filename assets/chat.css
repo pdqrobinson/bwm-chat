@@ -74,7 +74,26 @@
     align-items: center;
 }
 .bwm-selection-chip[hidden] { display: none; }
-.bwm-selection-chip button { border: 0; background: transparent; cursor: pointer; color: inherit; font-size: 18px; }
+.bwm-selection-chip span { overflow-wrap: anywhere; }
+/* Was a bare transparent glyph with no hit area — people could not find the deselect. */
+.bwm-selection-chip button {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 26px;
+    padding: 2px 10px;
+    border: 1px solid #bfdbfe;
+    border-radius: 999px;
+    background: #fff;
+    color: #1e3a8a;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+}
+.bwm-selection-chip button:hover { background: #dbeafe; border-color: #93c5fd; }
+.bwm-selection-chip button:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 #bwm-chat-messages {
     flex: 1;
     overflow-y: auto;

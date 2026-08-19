@@ -98,8 +98,17 @@
             return;
         }
         const label = selectedElement.text || selectedElement.selector || selectedElement.tag;
-        selectionLabel.textContent = (selectedElement.tag ? '<' + selectedElement.tag + '> ' : '') + label.slice(0, 90);
+        // Say "Editing" explicitly: the selection rides along on every message until it is
+        // cleared, and a bare element name did not make that obvious.
+        selectionLabel.textContent = 'Editing ' + (selectedElement.tag ? '<' + selectedElement.tag + '> ' : '') + label.slice(0, 90);
         selectionChip.hidden = false;
+    }
+
+    function clearSelection(announce) {
+        if (!selectedElement) return;
+        selectedElement = null;
+        showSelection();
+        if (announce) addMessage('bot', 'Selection cleared. Your next message applies to the whole page.');
     }
 
     document.addEventListener('mouseover', function (event) {
@@ -141,8 +150,17 @@
         if (selecting) stopSelecting(); else startSelecting();
     });
     clearSelectionBtn.addEventListener('click', function () {
-        selectedElement = null;
-        showSelection();
+        clearSelection(true);
+    });
+
+    // Escape is the expected way out of both select mode and an active selection.
+    document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape') return;
+        if (selecting) {
+            stopSelecting();
+            return;
+        }
+        if (selectedElement) clearSelection(true);
     });
 
     function addMessage(type, content) {
