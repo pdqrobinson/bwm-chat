@@ -28,6 +28,22 @@
     let selectedElement = null;
     let hoverTarget = null;
 
+    function getSessionKey() {
+        const storageKey = 'bwm-chat-session:' + window.location.origin + ':' + String(config.userId || 'user');
+        try {
+            const existing = window.localStorage.getItem(storageKey);
+            if (existing && /^[A-Za-z0-9._-]{8,128}$/.test(existing)) return existing;
+        } catch (_) {}
+        const random = window.crypto && typeof window.crypto.randomUUID === 'function'
+            ? window.crypto.randomUUID()
+            : Math.random().toString(36).slice(2) + Date.now().toString(36);
+        const created = ('bwm.' + random).slice(0, 128);
+        try { window.localStorage.setItem(storageKey, created); } catch (_) {}
+        return created;
+    }
+
+    const sessionKey = getSessionKey();
+
     function escapeCss(value) {
         if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(value);
         return String(value).replace(/[^A-Za-z0-9_-]/g, '\\$&');
@@ -60,13 +76,44 @@
         return parts.join(' > ').slice(0, 500);
     }
 
+    function safeAttributes(el) {
+        const allowed = ['id', 'class', 'href', 'src', 'alt', 'title', 'role', 'name', 'type', 'aria-label', 'aria-labelledby', 'aria-describedby'];
+        const out = {};
+        allowed.forEach(function (name) {
+            if (!el.hasAttribute || !el.hasAttribute(name)) return;
+            const value = String(el.getAttribute(name) || '').trim().slice(0, 500);
+            if (value) out[name] = value;
+        });
+        return out;
+    }
+
+    function fnv1a(value) {
+        let hash = 0x811c9dc5;
+        for (let i = 0; i < value.length; i++) {
+            hash ^= value.charCodeAt(i);
+            hash = Math.imul(hash, 0x01000193);
+        }
+        return ('00000000' + (hash >>> 0).toString(16)).slice(-8);
+    }
+
     function selectionFromElement(el) {
-        return {
+        const snapshot = {
             selector: selectorFor(el),
             tag: el.tagName.toLowerCase(),
             text: String(el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 1000),
-            classes: cleanClasses(el)
+            classes: cleanClasses(el),
+            attributes: safeAttributes(el),
+            snapshotVersion: 1
         };
+        const canonical = JSON.stringify({
+            tag: snapshot.tag,
+            selector: snapshot.selector,
+            text: snapshot.text,
+            classes: snapshot.classes,
+            attributes: snapshot.attributes
+        });
+        snapshot.fingerprint = 'fnv1a:' + fnv1a(canonical);
+        return snapshot;
     }
 
     function setHoverTarget(el) {
@@ -209,6 +256,9 @@
         } else if (artifact.type === 'warning') {
             title.textContent = 'Needs attention';
             detail.textContent = String(artifact.message || 'Command Center returned a warning.').slice(0, 300);
+        } else if (artifact.type === 'approval_request') {
+            title.textContent = 'Approval required';
+            detail.textContent = String(artifact.summary || artifact.message || 'Review this action before it runs.').slice(0, 300);
         } else if (artifact.type === 'page_reference' && artifact.pageUrl) {
             title.textContent = 'Page';
             const link = document.createElement('a');
@@ -244,22 +294,111 @@
         return row;
     }
 
-    function sendMessage() {
-        const message = input.value.trim();
+    function renderSuggestions(items) {
+        if (!Array.isArray(items) || !items.length) return;
+        const row = document.createElement('div');
+        row.className = 'bwm-chat-suggestions';
+        items.slice(0, 4).forEach(function (item) {
+            const spec = typeof item === 'string' ? { label: item, prompt: item } : item;
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'bwm-suggestion';
+            button.textContent = String(spec.label || spec.prompt || '').slice(0, 70);
+            button.addEventListener('click', function () {
+                input.value = String(spec.prompt || spec.label || '');
+                input.focus();
+            });
+            row.appendChild(button);
+        });
+        messages.appendChild(row);
+        messages.scrollTop = messages.scrollHeight;
+    }
+
+    function contextualSuggestions(data) {
+        const artifacts = Array.isArray(data && data.artifacts) ? data.artifacts : [];
+        const verified = artifacts.some(function (artifact) {
+            return artifact && artifact.type === 'verification_result' && artifact.status === 'pass';
+        });
+        if (data && data.change_made) {
+            return [
+                { label: verified ? 'Verify again' : 'Verify this change', prompt: 'Verify this change on desktop and mobile.' },
+                { label: 'Undo last change', prompt: '/rollback' },
+                { label: 'Adjust mobile', prompt: 'Check this on mobile and fix any spacing or sizing issues.' }
+            ];
+        }
+        if (selectedElement) {
+            return [
+                { label: 'What controls this?', prompt: 'What controls this selected element?' },
+                { label: 'Improve mobile', prompt: 'Improve this selected element on mobile.' },
+                { label: 'Rewrite text', prompt: 'Rewrite the text in this selected element to be clearer.' }
+            ];
+        }
+        return [
+            { label: 'Inspect this page', prompt: 'Inspect this page and tell me what needs attention.' },
+            { label: 'Check mobile', prompt: 'Check this page on mobile for layout issues.' }
+        ];
+    }
+
+    function classifyRequestRisk(message) {
+        const text = String(message || '').toLowerCase();
+        const highRisk = [
+            /\b(delete|remove)\s+(this\s+|the\s+)?(page|post|product|user|plugin|theme)\b/,
+            /\b(uninstall|deactivate)\s+(this\s+|the\s+)?(plugin|theme)\b/,
+            /\b(overwrite|replace)\s+(the\s+)?(entire|whole)\b/,
+            /\b(replace|rewrite)\s+(this\s+|the\s+)?(entire\s+|whole\s+)?section\b/,
+            /\b(drop|truncate)\s+(the\s+)?(table|database)\b/
+        ];
+        return highRisk.some(function (pattern) { return pattern.test(text); }) ? 'high' : 'low';
+    }
+
+    function addRiskConfirmation(message) {
+        const row = document.createElement('div');
+        row.className = 'bwm-chat-confirmation';
+        const copy = document.createElement('div');
+        copy.className = 'bwm-confirmation-copy';
+        copy.textContent = 'This request could replace or remove a larger piece of the site. Review it before I send it to Command Center.';
+        const actions = document.createElement('div');
+        actions.className = 'bwm-confirmation-actions';
+        const proceed = document.createElement('button');
+        proceed.type = 'button';
+        proceed.className = 'bwm-confirmation-proceed';
+        proceed.textContent = 'Continue';
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'bwm-confirmation-cancel';
+        cancel.textContent = 'Cancel';
+        actions.appendChild(proceed);
+        actions.appendChild(cancel);
+        row.appendChild(copy);
+        row.appendChild(actions);
+        messages.appendChild(row);
+        messages.scrollTop = messages.scrollHeight;
+
+        proceed.addEventListener('click', function () {
+            row.remove();
+            performSend(message, true);
+        });
+        cancel.addEventListener('click', function () {
+            row.remove();
+            addMessage('bot', 'Cancelled. Nothing was sent or changed.');
+        });
+    }
+
+    function performSend(message, alreadyRendered) {
         if (!message || isLoading) return;
         if (Number(config.usageCount || 0) >= Number(config.dailyLimit || 10)) {
             addMessage('bot', 'You have reached today\'s BWM Chat request limit.');
             return;
         }
 
-        addMessage('user', message);
-        input.value = '';
+        if (!alreadyRendered) addMessage('user', message);
         isLoading = true;
         sendBtn.disabled = true;
         const typing = addTypingIndicator();
         const formData = new FormData();
         formData.append('action', 'bwm_chat_message');
         formData.append('nonce', config.nonce);
+        formData.append('session_key', sessionKey);
         formData.append('message', message);
         formData.append('page_url', window.location.href);
         formData.append('post_id', String(config.postId || 0));
@@ -277,10 +416,10 @@
                     return;
                 }
                 addMessage('bot', data.data.response || 'Request processed.');
-                // Still tracked for the client-side daily guard, just not displayed.
                 config.usageCount = Number(data.data.usage_count || config.usageCount || 0);
                 if (usageCount) usageCount.textContent = String(config.usageCount);
                 (Array.isArray(data.data.artifacts) ? data.data.artifacts : []).forEach(addArtifact);
+                renderSuggestions(contextualSuggestions(data.data));
             })
             .catch(() => {
                 typing.remove();
@@ -288,6 +427,18 @@
                 sendBtn.disabled = false;
                 addMessage('bot', 'Connection error. Please try again.');
             });
+    }
+
+    function sendMessage() {
+        const message = input.value.trim();
+        if (!message || isLoading) return;
+        input.value = '';
+        if (classifyRequestRisk(message) === 'high') {
+            addMessage('user', message);
+            addRiskConfirmation(message);
+            return;
+        }
+        performSend(message, false);
     }
 
     sendBtn.addEventListener('click', sendMessage);
@@ -299,20 +450,11 @@
     });
 
     if (Number(config.usageCount || 0) === 0) {
-        const suggestions = ['What controls this section?', 'Make this heading smaller on mobile', 'Fix a typo', 'Update this page content'];
-        const row = document.createElement('div');
-        row.className = 'bwm-chat-suggestions';
-        suggestions.forEach(text => {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'bwm-suggestion';
-            button.textContent = text;
-            button.addEventListener('click', function () {
-                input.value = text;
-                input.focus();
-            });
-            row.appendChild(button);
-        });
-        messages.appendChild(row);
+        renderSuggestions([
+            { label: 'Inspect this page', prompt: 'Inspect this page and tell me what needs attention.' },
+            { label: 'Select something to edit', prompt: 'I want to select an element and edit it.' },
+            { label: 'Check mobile', prompt: 'Check this page on mobile for layout issues.' },
+            { label: 'Fix a typo', prompt: 'Help me fix a typo on this page.' }
+        ]);
     }
 })();
