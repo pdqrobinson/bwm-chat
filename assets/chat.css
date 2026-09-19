@@ -129,6 +129,36 @@
 .bwm-chat-suggestions { display: grid; gap: 6px; margin: 0 0 12px; }
 .bwm-suggestion { display: block; padding: 8px 10px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px; cursor: pointer; text-align: left; color: #334155; }
 .bwm-suggestion:hover { border-color: var(--bwm-color, #2563eb); color: var(--bwm-color, #2563eb); }
+.bwm-chat-confirmation {
+    margin: 0 0 12px;
+    padding: 12px;
+    border: 1px solid #f59e0b;
+    border-radius: 10px;
+    background: #fffbeb;
+    color: #78350f;
+    font-size: 12px;
+    line-height: 1.45;
+}
+.bwm-confirmation-copy { margin-bottom: 9px; }
+.bwm-confirmation-actions { display: flex; gap: 8px; }
+.bwm-confirmation-actions button {
+    border-radius: 8px;
+    padding: 7px 11px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+.bwm-confirmation-proceed {
+    border: 1px solid #b45309;
+    background: #b45309;
+    color: #fff;
+}
+.bwm-confirmation-cancel {
+    border: 1px solid #d6d3d1;
+    background: #fff;
+    color: #44403c;
+}
+.bwm-confirmation-actions button:focus-visible { outline: 2px solid var(--bwm-color, #2563eb); outline-offset: 2px; }
 .bwm-chat-footer { padding: 9px 16px; text-align: center; border-top: 1px solid #e2e8f0; background: #f8fafc; }
 .bwm-chat-footer a { font-size: 11px; color: #64748b; text-decoration: none; }
 .bwm-typing { display: flex; gap: 4px; padding: 5px 2px; }
