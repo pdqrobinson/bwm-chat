@@ -3,7 +3,7 @@
  * Plugin Name: BWM Client Chat
  * Plugin URI: https://www.betterwebmanagement.com
  * Description: Client-facing website assistant powered by Better Web Management Command Center.
- * Version: 2.1.1
+ * Version: 2.2.0
  * Author: Better Web Management
  * Author URI: https://www.betterwebmanagement.com
  * License: GPL v2 or later
@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) exit;
 final class BWM_Client_Chat {
     private static $instance = null;
     private $option_name = 'bwm_client_chat_settings';
-    private $version = '2.1.1';
+    private $version = '2.2.0';
 
     public static function get_instance() {
         if (self::$instance === null) self::$instance = new self();
@@ -222,6 +222,7 @@ final class BWM_Client_Chat {
             'usageCount' => $this->get_usage()['count'],
             'isLoggedIn' => is_user_logged_in(),
             'userName' => wp_get_current_user()->display_name,
+            'userId' => intval(wp_get_current_user()->ID),
             'openByDefault' => $settings['open_by_default'],
             'postId' => $post_id ? intval($post_id) : 0,
             'postType' => $post_id ? (string) get_post_type($post_id) : '',
@@ -244,12 +245,87 @@ final class BWM_Client_Chat {
             $clean = sanitize_html_class($class);
             if ($clean !== '') $classes[] = substr($clean, 0, 80);
         }
+        $attributes = [];
+        foreach (array_slice((array) ($decoded['attributes'] ?? []), 0, 12, true) as $name => $value) {
+            $name = strtolower((string) $name);
+            if (!preg_match('/^(id|class|href|src|alt|title|role|name|type|aria-[a-z0-9_-]+)$/', $name)) continue;
+            $attributes[$name] = substr(sanitize_text_field((string) $value), 0, 500);
+        }
+        $fingerprint = substr(sanitize_text_field($decoded['fingerprint'] ?? ''), 0, 100);
+        if ($fingerprint !== '' && !preg_match('/^(sha256|fnv1a):[a-f0-9]{8,64}$/i', $fingerprint)) $fingerprint = '';
+
         return array_filter([
             'selector' => substr(sanitize_text_field($decoded['selector'] ?? ''), 0, 500),
             'tag' => substr(sanitize_key($decoded['tag'] ?? ''), 0, 80),
             'text' => substr(sanitize_text_field($decoded['text'] ?? ''), 0, 1000),
             'classes' => $classes,
+            'attributes' => $attributes,
+            'fingerprint' => $fingerprint,
+            'snapshotVersion' => max(1, min(10, intval($decoded['snapshotVersion'] ?? 1))),
         ], function($value) { return $value !== '' && $value !== []; });
+    }
+
+    private function sanitize_session_key($raw) {
+        $key = trim((string) wp_unslash($raw));
+        return preg_match('/^[A-Za-z0-9._-]{8,128}$/', $key) ? $key : '';
+    }
+
+    private function build_runtime_manifest() {
+        $active = array_values((array) get_option('active_plugins', []));
+        if (is_multisite()) {
+            $network = array_keys((array) get_site_option('active_sitewide_plugins', []));
+            $active = array_values(array_unique(array_merge($active, $network)));
+        }
+        $has_plugin = function($needles) use ($active) {
+            foreach ($active as $plugin) {
+                $plugin = strtolower((string) $plugin);
+                foreach ((array) $needles as $needle) {
+                    if (strpos($plugin, strtolower((string) $needle)) !== false) return true;
+                }
+            }
+            return false;
+        };
+
+        $post_id = get_queried_object_id();
+        $theme = wp_get_theme();
+        $stylesheet = strtolower((string) $theme->get_stylesheet());
+        $editor = 'classic';
+        if ($has_plugin(['livecanvas'])) $editor = 'livecanvas';
+        elseif ($has_plugin(['elementor'])) $editor = 'elementor';
+        elseif ($post_id && function_exists('use_block_editor_for_post') && use_block_editor_for_post($post_id)) $editor = 'gutenberg';
+
+        $features = [
+            'livecanvas' => $has_plugin(['livecanvas']),
+            'woocommerce' => class_exists('WooCommerce') || $has_plugin(['woocommerce/']),
+            'acf' => function_exists('get_field') || $has_plugin(['advanced-custom-fields', 'acf-pro']),
+            'elementor' => defined('ELEMENTOR_VERSION') || $has_plugin(['elementor/']),
+            'rank_math' => defined('RANK_MATH_VERSION') || $has_plugin(['seo-by-rank-math']),
+            'fluent_forms' => $has_plugin(['fluentform', 'fluent-forms']),
+            'gravity_forms' => class_exists('GFForms') || $has_plugin(['gravityforms']),
+            'contact_form_7' => defined('WPCF7_VERSION') || $has_plugin(['contact-form-7']),
+        ];
+
+        return [
+            'protocolVersion' => 2,
+            'wordpress' => [
+                'version' => (string) get_bloginfo('version'),
+                'multisite' => is_multisite(),
+            ],
+            'editor' => $editor,
+            'theme' => [
+                'name' => (string) $theme->get('Name'),
+                'stylesheet' => (string) $theme->get_stylesheet(),
+                'template' => (string) $theme->get_template(),
+                'version' => (string) $theme->get('Version'),
+                'picostrap' => strpos($stylesheet, 'picostrap') !== false,
+            ],
+            'page' => [
+                'postId' => $post_id ? intval($post_id) : 0,
+                'postType' => $post_id ? (string) get_post_type($post_id) : '',
+                'template' => $post_id ? (string) get_page_template_slug($post_id) : '',
+            ],
+            'features' => $features,
+        ];
     }
 
     private function sanitize_page_context() {
@@ -278,9 +354,11 @@ final class BWM_Client_Chat {
         $result = $this->api_post('/message', [
             'api_key' => $settings['client_api_key'],
             'site_url' => get_site_url(),
+            'session_key' => $this->sanitize_session_key($_POST['session_key'] ?? ''),
             'message' => $message,
             'page' => $this->sanitize_page_context(),
             'selection' => $this->sanitize_selection($_POST['selection'] ?? ''),
+            'runtime' => $this->build_runtime_manifest(),
             'user' => ['wpUserId' => intval($user->ID), 'name' => $user->display_name, 'roles' => array_values((array) $user->roles)],
         ], 120);
 
