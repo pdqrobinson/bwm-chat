@@ -9,7 +9,7 @@ The plugin intentionally does **not** run an LLM or privileged agent inside Word
 ```text
 WordPress user
   -> BWM Client Chat plugin
-  -> https://getbetterai.co/api/client-chat
+  -> https://bwmxdev.com/api/client-chat
   -> Command Center site-chat runtime
   -> external HTTP/browser inspection + BWM Remote Management
   -> authenticated website
@@ -38,7 +38,7 @@ Command Center owns agent execution, model credentials, client context, permissi
 - WordPress with HTTPS
 - BWM Remote Management connected for initial site ownership proof and WordPress operations
 - The site/client registered in BWM Command Center
-- Outbound HTTPS access from WordPress to `https://getbetterai.co`
+- Outbound HTTPS access from WordPress to `https://bwmxdev.com`
 
 ## Installation
 
@@ -51,7 +51,7 @@ Command Center owns agent execution, model credentials, client context, permissi
 The default API endpoint is:
 
 ```text
-https://getbetterai.co/api/client-chat
+https://bwmxdev.com/api/client-chat
 ```
 
 For controlled development only, it can be overridden before plugin load:
